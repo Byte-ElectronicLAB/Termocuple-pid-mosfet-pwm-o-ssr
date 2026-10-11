@@ -42,8 +42,6 @@ enum SystemState {
   ABOUT_SCREEN,
   TEST_MODE_SCREEN,
   RESET_CONFIRMATION,
-  // ➡️ NUEVA FUNCIÓN
-  // Nuevo estado para la configuración de alarmas.
   ALARM_CONFIG,
   ERROR
 };
@@ -65,13 +63,13 @@ OutputType currentOutputType;
 bool outputActive = false;
 bool serialConnected = false;
 
-// ➡️ NUEVA FUNCIÓN
-// Variables para las alarmas.
+// Variables para alarmas
 float highTempAlarm = 90.0;
 bool highTempAlarmActive = false;
-bool setpointReachedAlarm = true; // Por defecto activada
 bool buzzerEnabled = true;
 float highTempAlarmAux;
+bool setpointReachedAlarm = true;
+
 const char mainMenuOptions_0[] PROGMEM = "Activar / Desac.  ";
 const char mainMenuOptions_1[] PROGMEM = "Opciones Avanzadas";
 const char mainMenuOptions_2[] PROGMEM = "Modo Manual       ";
@@ -92,8 +90,6 @@ const char* const mainMenuOptions[] PROGMEM = {
 };
 const int totalMenuOptions = 8;
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Agregamos "Config Alarmas" al menú avanzado.
 const char advancedMenuOptions_0[] PROGMEM = "Config PID        ";
 const char advancedMenuOptions_1[] PROGMEM = "Config ON/OFF     ";
 const char advancedMenuOptions_2[] PROGMEM = "Config Alarmas    ";
@@ -109,7 +105,6 @@ const char* const advancedMenuOptions[] PROGMEM = {
   advancedMenuOptions_5
 };
 const int totalAdvancedMenuOptions = 6;
-
 const int optionsPerPage = 6;
 
 int selectedOption = 0;
@@ -155,10 +150,8 @@ unsigned long lastEncoderMovementTime = 0;
 const unsigned long fastTurnThreshold = 200;
 long encoderDelta = 0;
 
-// ➡️ CAMBIO SOLICITADO
-// Variables para el temporizador de inactividad
 unsigned long lastInteractionTime = 0;
-const unsigned long menuTimeout = 10000; // 30 segundos
+const unsigned long menuTimeout = 10000;
 
 // ================================================================
 // PROTOTIPOS DE FUNCIONES
@@ -192,10 +185,9 @@ void checkSerialConnection();
 void sendSerialData();
 void handleResetConfirmationState();
 void drawMenu(const char* menuTitle, const char* const menuOptions[], int totalOptions, int& selectedOption, long& oldSelectedOption, bool redraw);
-// ➡️ NUEVA FUNCIÓN
-// Nuevo prototipo para la función de alarmas.
 void checkAlarms();
 void handleAlarmConfigState(long newPos);
+
 // ================================================================
 // SETUP
 // ================================================================
@@ -227,8 +219,6 @@ void setup() {
   myPID.SetMode(AUTOMATIC);
 
   displayBootScreen();
-  // ➡️ CAMBIO SOLICITADO
-  // Inicializamos el temporizador de inactividad
   lastInteractionTime = millis();
 }
 
@@ -243,19 +233,13 @@ void loop() {
   checkHeatingFailure();
   checkSerialConnection();
   sendSerialData();
-  // ➡️ NUEVA FUNCIÓN
-  // Llamamos a la función que chequea las alarmas en cada ciclo.
   checkAlarms();
 
-  // ➡️ CAMBIO SOLICITADO
-  // Lógica de temporizador para salir del menú después de 30 segundos.
   if (currentState != BOOT_SCREEN && currentState != CONTROL && millis() - lastInteractionTime > menuTimeout) {
     currentState = CONTROL;
     u8x8.clearDisplay();
   }
 
-  // ➡️ CAMBIO SOLICITADO
-  // Actualizamos el tiempo de interacción con el encoder
   if (newPos != oldEncoderPosition) {
     lastInteractionTime = millis();
   }
@@ -312,8 +296,6 @@ void loop() {
     case CONTROL:
       handleControlState(newPos);
       break;
-    // ➡️ NUEVA FUNCIÓN
-    // Agregamos el manejo del nuevo estado de configuración de alarmas.
     case ALARM_CONFIG:
       handleAlarmConfigState(newPos);
       break;
@@ -332,8 +314,6 @@ void loop() {
 // IMPLEMENTACIÓN DE FUNCIONES
 // ================================================================
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Agregamos la carga de los nuevos valores de la EEPROM.
 byte calculateChecksum() {
   byte checksum = 0;
   for (int i = 0; i < 41; i++) {
@@ -342,8 +322,6 @@ byte calculateChecksum() {
   return checksum;
 }
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Agregamos la carga de los nuevos valores de la EEPROM.
 void loadConfiguration() {
   byte storedChecksum;
   EEPROM.get(41, storedChecksum);
@@ -355,22 +333,25 @@ void loadConfiguration() {
     EEPROM.get(12, ki);
     EEPROM.get(16, kd);
     EEPROM.get(20, calibrationOffset);
+
     int mode;
     EEPROM.get(24, mode);
     currentControlMode = (mode >= 0 && mode <= 2) ? (ControlMode)mode : MODE_ONOFF;
+
     int outputType;
     EEPROM.get(28, outputType);
     currentOutputType = (outputType >= 0 && outputType <= 1) ? (OutputType)outputType : OUTPUT_MOSFET_PWM;
+
     int manualOutput;
     EEPROM.get(32, manualOutput);
     manualOutputValue = (manualOutput >= 0 && manualOutput <= 255) ? manualOutput : 0;
-    // Carga de las nuevas variables de alarma
+
     EEPROM.get(36, highTempAlarm);
     bool tempBuzzerEnabled;
     EEPROM.get(40, tempBuzzerEnabled);
     buzzerEnabled = tempBuzzerEnabled;
   } else {
-    Serial.println("EEPROM Corrupta. Cargando valores de fábrica.");
+    Serial.println("EEPROM Corrupta. Cargando valores de fabrica.");
     resetToFactorySettings();
   }
 
@@ -386,8 +367,6 @@ void loadConfiguration() {
   highTempAlarmAux = highTempAlarm;
 }
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Agregamos el guardado de los nuevos valores en la EEPROM.
 void saveConfiguration() {
   EEPROM.put(0, setpoint);
   EEPROM.put(4, onOffHysteresis);
@@ -398,7 +377,6 @@ void saveConfiguration() {
   EEPROM.put(24, (int)currentControlMode);
   EEPROM.put(28, (int)currentOutputType);
   EEPROM.put(32, manualOutputValue);
-  // Guardado de las nuevas variables de alarma
   EEPROM.put(36, highTempAlarm);
   EEPROM.put(40, buzzerEnabled);
 
@@ -406,8 +384,6 @@ void saveConfiguration() {
   EEPROM.put(41, checksum);
 }
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Agregamos los nuevos valores de alarma a los valores de fábrica.
 void resetToFactorySettings() {
   setpoint = 30.0;
   onOffHysteresis = 2.0;
@@ -440,10 +416,9 @@ void displayBootScreen() {
   delay(500);
 }
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Mejoras en la UI.
 void handleControlState(long newPos) {
   if (isnan(currentTemp) || isnan(setpoint)) return;
+
   static float lastTemp = -999.0;
   static float lastSet = -999.0;
   static bool lastOutputActive = !outputActive;
@@ -452,6 +427,7 @@ void handleControlState(long newPos) {
   static bool lastSerialState = serialConnected;
   static OutputType lastOutputType = currentOutputType;
   static bool lastHighTempAlarmActive = false;
+
   if (newPos != oldEncoderPosition) {
     if (millis() - lastEncoderMovementTime < fastTurnThreshold) {
       setpoint += (float)(newPos - oldEncoderPosition) * 10;
@@ -475,8 +451,13 @@ void handleControlState(long newPos) {
   }
 
   int pidOutputPercent = (int)(pidOutput / 2.55);
-  // Redibujar solo si hay cambios o si la alarma se activó/desactivó
-  if (abs(currentTemp - lastTemp) > 0.1 || abs(setpoint - lastSet) > 0.1 || outputActive != lastOutputActive || currentControlMode != lastControlMode || (currentControlMode == MODE_PID && pidOutputPercent != lastPidOutputPercent) || serialConnected != lastSerialState || lastOutputType != currentOutputType || highTempAlarmActive != lastHighTempAlarmActive) {
+
+  if (abs(currentTemp - lastTemp) > 0.1 || abs(setpoint - lastSet) > 0.1 ||
+      outputActive != lastOutputActive || currentControlMode != lastControlMode ||
+      (currentControlMode == MODE_PID && pidOutputPercent != lastPidOutputPercent) ||
+      serialConnected != lastSerialState || currentOutputType != lastOutputType ||
+      highTempAlarmActive != lastHighTempAlarmActive) {
+
     u8x8.clearDisplay();
     u8x8.setFont(u8x8_font_amstrad_cpc_extended_r);
 
@@ -492,26 +473,24 @@ void handleControlState(long newPos) {
 
     u8x8.drawString(x_offset, 4, "Estado:");
     u8x8.setCursor(x_offset + 8, 4);
-    // ➡️ MODIFICACIÓN A CÓDIGO
-    // Agregamos un indicador visual para "CALENTANDO"
     if (outputActive) {
-        u8x8.print("ACTIVO");
+      u8x8.print("ACTIVO");
     } else {
       u8x8.print("APAGADO");
     }
 
     u8x8.drawString(x_offset, 5, "Calef:");
     u8x8.setCursor(x_offset + 7, 5);
-    if(pidOutput > 0) { // O si el modo ON/OFF está encendido
-        u8x8.print("CALENTANDO");
+    if (pidOutput > 0) {
+      u8x8.print("CALENTANDO");
     } else {
-        u8x8.print("OFF");
+      u8x8.print("OFF");
     }
 
     if (serialConnected) {
       u8x8.drawString(x_offset, 6, "Serial OK");
     }
-    
+
     u8x8.setCursor(x_offset, 7);
     if (currentOutputType == OUTPUT_SSR) {
       u8x8.print("Salida: SSR");
@@ -519,14 +498,12 @@ void handleControlState(long newPos) {
       u8x8.print("Salida: MOSFET");
     }
 
-    // ➡️ NUEVA FUNCIÓN
-    // Si la alarma de alta temperatura está activa, mostramos un mensaje.
     if (highTempAlarmActive) {
-        u8x8.clearDisplay();
-        u8x8.drawString(x_offset, 2, "ALARMA!");
-        u8x8.drawString(x_offset, 3, "TEMP ALTA");
-        u8x8.drawString(x_offset, 5, "Presione para");
-        u8x8.drawString(x_offset, 6, "silenciar");
+      u8x8.clearDisplay();
+      u8x8.drawString(x_offset, 2, "ALARMA!");
+      u8x8.drawString(x_offset, 3, "TEMP ALTA");
+      u8x8.drawString(x_offset, 5, "Presione para");
+      u8x8.drawString(x_offset, 6, "silenciar");
     }
 
     lastTemp = currentTemp;
@@ -541,129 +518,166 @@ void handleControlState(long newPos) {
 }
 
 void drawMenu(const char* menuTitle, const char* const menuOptions[], int totalOptions, int& selectedOption, long& oldSelectedOption, bool redraw) {
-    if (redraw) {
-        char buffer[30];
-        u8x8.clearDisplay();
-        u8x8.setFont(u8x8_font_amstrad_cpc_extended_r);
-        u8x8.drawString(x_offset, 0, menuTitle);
+  if (redraw) {
+    char buffer[30];
+    u8x8.clearDisplay();
+    u8x8.setFont(u8x8_font_amstrad_cpc_extended_r);
+    u8x8.drawString(x_offset, 0, menuTitle);
 
-        int menuPage = selectedOption / optionsPerPage;
-        int startOption = menuPage * optionsPerPage;
-        int endOption = startOption + optionsPerPage;
-        if (endOption > totalOptions) endOption = totalOptions;
-        for (int i = startOption; i < endOption; i++) {
-            strcpy_P(buffer, (PGM_P)pgm_read_word(&(menuOptions[i])));
-            u8x8.drawString(x_offset + 1, (i - startOption) + 2, buffer);
-        }
+    int page = selectedOption / optionsPerPage;
+    int startOption = page * optionsPerPage;
+    int endOption = startOption + optionsPerPage;
+    if (endOption > totalOptions) endOption = totalOptions;
 
-        u8x8.drawString(x_offset, (selectedOption - startOption) + 2, ">");
+    for (int i = startOption; i < endOption; i++) {
+      strcpy_P(buffer, (PGM_P)pgm_read_word(&(menuOptions[i])));
+      u8x8.drawString(x_offset + 1, (i - startOption) + 2, buffer);
     }
+
+    u8x8.drawString(x_offset, (selectedOption - startOption) + 2, ">");
+  }
 }
 
 void handleMenuState(long newPos) {
-    static bool redrawMenu = true;
-    if (newPos != oldEncoderPosition) {
-        selectedOption += (newPos - oldEncoderPosition);
-        if (selectedOption < 0) selectedOption = totalMenuOptions - 1;
-        if (selectedOption >= totalMenuOptions) selectedOption = 0;
-        oldEncoderPosition = newPos;
-        redrawMenu = true;
-    }
+  static bool redrawMenu = true;
 
-    drawMenu("Menu Principal", mainMenuOptions, totalMenuOptions, selectedOption, oldEncoderPosition, redrawMenu);
-    redrawMenu = false;
-    if (buttonClicked) {
-      buttonClicked = false;
-      redrawMenu = true;
-      // ➡️ CAMBIO SOLICITADO
-      // Actualizamos el tiempo de interacción del botón
-      lastInteractionTime = millis();
-      switch(selectedOption) {
-          case 0:
-              outputActive = !outputActive;
-              if (outputActive) {
-                  currentControlMode = controlModeAux;
-              }
-              saveConfiguration();
-              currentState = CONTROL;
-              myEnc.write(0);
-              break;
-          case 1: currentState = ADVANCED_CONFIG; myEnc.write(0); selectedAdvancedOption = 0; break;
-          case 2: currentState = MANUAL_CONTROL; myEnc.write(0); break;
-          case 3: currentState = CALIBRATION_CONFIG; myEnc.write(0); break;
-          case 4: currentState = TEST_MODE_SCREEN; myEnc.write(0); break;
-          case 5: currentState = ABOUT_SCREEN; myEnc.write(0);
-              break;
-          case 6: currentState = RESET_CONFIRMATION; myEnc.write(0); break;
-          case 7: currentState = CONTROL; myEnc.write(0); break;
-      }
-    } else if (longPressDetected) {
-      longPressDetected = false;
-      redrawMenu = true;
-      currentState = CONTROL;
+  if (newPos != oldEncoderPosition) {
+    selectedOption += (newPos - oldEncoderPosition);
+    if (selectedOption < 0) selectedOption = totalMenuOptions - 1;
+    if (selectedOption >= totalMenuOptions) selectedOption = 0;
+    oldEncoderPosition = newPos;
+    redrawMenu = true;
+  }
+
+  drawMenu("Menu Principal", mainMenuOptions, totalMenuOptions, selectedOption, oldEncoderPosition, redrawMenu);
+  redrawMenu = false;
+
+  if (buttonClicked) {
+    buttonClicked = false;
+    redrawMenu = true;
+    lastInteractionTime = millis();
+
+    switch (selectedOption) {
+      case 0:
+        outputActive = !outputActive;
+        if (outputActive) {
+          currentControlMode = controlModeAux;
+        }
+        saveConfiguration();
+        currentState = CONTROL;
+        myEnc.write(0);
+        break;
+      case 1:
+        currentState = ADVANCED_CONFIG;
+        myEnc.write(0);
+        selectedAdvancedOption = 0;
+        break;
+      case 2:
+        currentState = MANUAL_CONTROL;
+        myEnc.write(0);
+        break;
+      case 3:
+        currentState = CALIBRATION_CONFIG;
+        myEnc.write(0);
+        break;
+      case 4:
+        currentState = TEST_MODE_SCREEN;
+        myEnc.write(0);
+        break;
+      case 5:
+        currentState = ABOUT_SCREEN;
+        myEnc.write(0);
+        break;
+      case 6:
+        currentState = RESET_CONFIRMATION;
+        myEnc.write(0);
+        break;
+      case 7:
+        currentState = CONTROL;
+        myEnc.write(0);
+        break;
     }
+  } else if (longPressDetected) {
+    longPressDetected = false;
+    redrawMenu = true;
+    currentState = CONTROL;
+    lastInteractionTime = millis();
+  }
 }
 
-// ➡️ MODIFICACIÓN A CÓDIGO
-// Agregamos el nuevo caso para el menú de alarmas.
 void handleAdvancedMenuState(long newPos) {
-    static bool redrawMenu = true;
-    char buffer[30];
-    if (newPos != oldEncoderPosition) {
-        selectedAdvancedOption += (newPos - oldEncoderPosition);
-        if (selectedAdvancedOption < 0) selectedAdvancedOption = totalAdvancedMenuOptions - 1;
-        if (selectedAdvancedOption >= totalAdvancedMenuOptions) selectedAdvancedOption = 0;
-        oldEncoderPosition = newPos;
-        redrawMenu = true;
+  static bool redrawMenu = true;
+  char buffer[30];
+
+  if (newPos != oldEncoderPosition) {
+    selectedAdvancedOption += (newPos - oldEncoderPosition);
+    if (selectedAdvancedOption < 0) selectedAdvancedOption = totalAdvancedMenuOptions - 1;
+    if (selectedAdvancedOption >= totalAdvancedMenuOptions) selectedAdvancedOption = 0;
+    oldEncoderPosition = newPos;
+    redrawMenu = true;
+  }
+
+  if (redrawMenu) {
+    u8x8.clearDisplay();
+    u8x8.setFont(u8x8_font_amstrad_cpc_extended_r);
+    u8x8.drawString(x_offset, 0, "Opciones Avanzadas");
+
+    for (int i = 0; i < totalAdvancedMenuOptions; i++) {
+      strcpy_P(buffer, (PGM_P)pgm_read_word(&(advancedMenuOptions[i])));
+      u8x8.drawString(x_offset + 1, i + 2, buffer);
     }
 
-    if (redrawMenu) {
-        u8x8.clearDisplay();
-        u8x8.setFont(u8x8_font_amstrad_cpc_extended_r);
-        u8x8.drawString(x_offset, 0, "Opciones Avanzadas");
-        // Ajustamos las opciones del menú para el nuevo tamaño
-        for (int i = 0; i < totalAdvancedMenuOptions; i++) {
-            strcpy_P(buffer, (PGM_P)pgm_read_word(&(advancedMenuOptions[i])));
-            u8x8.drawString(x_offset + 1, i + 2, buffer);
+    u8x8.drawString(x_offset, selectedAdvancedOption + 2, ">");
+    redrawMenu = false;
+  }
+
+  if (buttonClicked) {
+    buttonClicked = false;
+    redrawMenu = true;
+    lastInteractionTime = millis();
+
+    switch (selectedAdvancedOption) {
+      case 0:
+        if (currentOutputType == OUTPUT_SSR) {
+          u8x8.clearDisplay();
+          u8x8.drawString(x_offset, 0, "No disponible");
+          u8x8.drawString(x_offset, 1, "con salida SSR");
+          delay(2000);
+          currentState = ADVANCED_CONFIG;
+        } else {
+          currentState = PID_CONFIG;
+          myEnc.write(0);
         }
-
-        u8x8.drawString(x_offset, selectedAdvancedOption + 2, ">");
-        redrawMenu = false;
+        break;
+      case 1:
+        currentState = ONOFF_CONFIG;
+        myEnc.write(0);
+        break;
+      case 2:
+        currentState = ALARM_CONFIG;
+        myEnc.write(0);
+        break;
+      case 3:
+        currentState = SSR_ACTIVATION_CONFIRMATION;
+        myEnc.write(0);
+        confirmationCount = 0;
+        break;
+      case 4:
+        currentState = MOSFET_ACTIVATION_CONFIRMATION;
+        myEnc.write(0);
+        confirmationCount = 0;
+        break;
+      case 5:
+        currentState = MENU;
+        myEnc.write(0);
+        break;
     }
-
-    if (buttonClicked) {
-      buttonClicked = false;
-      redrawMenu = true;
-      // ➡️ CAMBIO SOLICITADO
-      // Actualizamos el tiempo de interacción del botón
-      lastInteractionTime = millis();
-
-      switch(selectedAdvancedOption) {
-          case 0:
-              if (currentOutputType == OUTPUT_SSR) {
-                  u8x8.clearDisplay();
-                  u8x8.drawString(x_offset, 0, "No disponible");
-                  u8x8.drawString(x_offset, 1, "con salida SSR");
-                  delay(2000);
-                  currentState = ADVANCED_CONFIG;
-              } else {
-                  currentState = PID_CONFIG;
-                  myEnc.write(0);
-              }
-              break;
-          case 1: currentState = ONOFF_CONFIG; myEnc.write(0); break;
-          // ➡️ NUEVA FUNCIÓN
-          // Nuevo caso para el menú de configuración de alarmas.
-          case 2: currentState = ALARM_CONFIG; myEnc.write(0); break;
-          case 3: currentState = SSR_ACTIVATION_CONFIRMATION; myEnc.write(0); confirmationCount = 0; break;
-          case 4: currentState = MOSFET_ACTIVATION_CONFIRMATION; myEnc.write(0); confirmationCount = 0; break;
-          case 5: currentState = MENU; myEnc.write(0); break;
-      }
-    } else if (longPressDetected) {
-      longPressDetected = false;
-      redrawMenu = true;
-      currentState = MENU;
-    }
+  } else if (longPressDetected) {
+    longPressDetected = false;
+    redrawMenu = true;
+    currentState = MENU;
+    lastInteractionTime = millis();
+  }
 }
 
 void handleOnOffConfigState(long newPos) {
@@ -677,8 +691,7 @@ void handleOnOffConfigState(long newPos) {
     firstEnter = false;
     redraw = true;
   }
-  // ➡️ CAMBIO SOLICITADO
-  // Actualizamos el tiempo de interacción del encoder
+
   if (newPos != oldEncoderPosition) {
     lastInteractionTime = millis();
   }
@@ -688,8 +701,6 @@ void handleOnOffConfigState(long newPos) {
     selectedOptionOnOff = (selectedOptionOnOff + 1) % 2;
     redraw = true;
     myEnc.write(0);
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
   } else if (longPressDetected) {
     longPressDetected = false;
@@ -698,7 +709,7 @@ void handleOnOffConfigState(long newPos) {
     currentControlMode = MODE_ONOFF;
     controlModeAux = MODE_ONOFF;
     saveConfiguration();
-    
+
     u8x8.clearDisplay();
     u8x8.drawString(x_offset, 3, "Guardado!");
     buzzerBeep(1, 100, 0);
@@ -746,6 +757,7 @@ void handlePIDConfigState(long newPos) {
   static int selectedOptionPid = 0;
   static bool redraw = true;
   static bool firstEnter = true;
+
   if (firstEnter) {
     kpAux = kp;
     kiAux = ki;
@@ -753,8 +765,7 @@ void handlePIDConfigState(long newPos) {
     firstEnter = false;
     redraw = true;
   }
-  // ➡️ CAMBIO SOLICITADO
-  // Actualizamos el tiempo de interacción del encoder
+
   if (newPos != oldEncoderPosition) {
     lastInteractionTime = millis();
   }
@@ -764,8 +775,6 @@ void handlePIDConfigState(long newPos) {
     selectedOptionPid = (selectedOptionPid + 1) % 3;
     redraw = true;
     myEnc.write(0);
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
   } else if (longPressDetected) {
     longPressDetected = false;
@@ -776,7 +785,7 @@ void handlePIDConfigState(long newPos) {
     currentControlMode = MODE_PID;
     controlModeAux = MODE_PID;
     saveConfiguration();
-    
+
     u8x8.clearDisplay();
     u8x8.drawString(x_offset, 3, "Guardado!");
     buzzerBeep(1, 100, 0);
@@ -792,10 +801,11 @@ void handlePIDConfigState(long newPos) {
     if (millis() - lastEncoderMovementTime < fastTurnThreshold) {
       delta *= 10;
     }
-    
+
     if (selectedOptionPid == 0) kpAux += delta * 0.1;
     if (selectedOptionPid == 1) kiAux += delta * 0.01;
     if (selectedOptionPid == 2) kdAux += delta * 0.01;
+
     oldEncoderPosition = newPos;
     redraw = true;
     lastEncoderMovementTime = millis();
@@ -816,82 +826,78 @@ void handlePIDConfigState(long newPos) {
   }
 }
 
-// ➡️ NUEVA FUNCIÓN
-// Función para manejar el nuevo estado de configuración de alarmas.
 void handleAlarmConfigState(long newPos) {
-    static int selectedOptionAlarm = 0;
-    static bool redraw = true;
-    static bool firstEnter = true;
-    if (firstEnter) {
-        highTempAlarmAux = highTempAlarm;
-        myEnc.write(highTempAlarmAux);
-        firstEnter = false;
-        redraw = true;
+  static int selectedOptionAlarm = 0;
+  static bool redraw = true;
+  static bool firstEnter = true;
+
+  if (firstEnter) {
+    highTempAlarmAux = highTempAlarm;
+    myEnc.write(highTempAlarmAux * 4);
+    firstEnter = false;
+    redraw = true;
+  }
+
+  if (newPos != oldEncoderPosition) {
+    lastInteractionTime = millis();
+  }
+
+  if (newPos != oldEncoderPosition) {
+    int delta = newPos - oldEncoderPosition;
+    if (millis() - lastEncoderMovementTime < fastTurnThreshold) {
+      delta *= 10;
     }
 
-    newPos = myEnc.read();
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del encoder
-    if (newPos != oldEncoderPosition) {
-        lastInteractionTime = millis();
-    }
+    if (selectedOptionAlarm == 0) highTempAlarmAux += delta;
+    if (highTempAlarmAux < setpoint) highTempAlarmAux = setpoint + 5.0;
+    if (highTempAlarmAux > 250.0) highTempAlarmAux = 250.0;
 
-    if (newPos != oldEncoderPosition) {
-        int delta = newPos - oldEncoderPosition;
-        if (millis() - lastEncoderMovementTime < fastTurnThreshold) {
-            delta *= 10;
-        }
+    oldEncoderPosition = newPos;
+    redraw = true;
+    lastEncoderMovementTime = millis();
+  }
 
-        if (selectedOptionAlarm == 0) highTempAlarmAux += delta;
-        if (highTempAlarmAux < setpoint) highTempAlarmAux = setpoint + 5.0; // Mínimo 5°C por encima del setpoint
-        if (highTempAlarmAux > 250.0) highTempAlarmAux = 250.0;
-        oldEncoderPosition = newPos;
-        redraw = true;
-        lastEncoderMovementTime = millis();
-    }
+  if (redraw) {
+    u8x8.clearDisplay();
+    u8x8.drawString(x_offset, 0, "Config Alarmas");
+    u8x8.setCursor(x_offset, 2);
+    u8x8.print("Temp alta:"); u8x8.setCursor(x_offset + 11, 2); u8x8.print(highTempAlarmAux, 0); u8x8.print("C");
+    u8x8.drawString(x_offset, 4, "Click: guardar");
+    u8x8.drawString(x_offset, 6, "Long: salir");
+    redraw = false;
+  }
 
-    if (redraw) {
-        u8x8.clearDisplay();
-        u8x8.drawString(x_offset, 0, "Config Alarmas");
-        u8x8.setCursor(x_offset, 2);
-        u8x8.print("Temp alta:"); u8x8.setCursor(x_offset + 11, 2); u8x8.print(highTempAlarmAux, 0); u8x8.print("C");
-        u8x8.drawString(x_offset, 4, "Click: guardar");
-        u8x8.drawString(x_offset, 6, "Long: salir");
-        redraw = false;
-    }
-    if (buttonClicked) {
-      buttonClicked = false;
-      highTempAlarm = highTempAlarmAux;
-      saveConfiguration();
-      u8x8.clearDisplay();
-      u8x8.drawString(x_offset, 3, "Guardado!");
-      buzzerBeep(1, 100, 0);
-      delay(1000);
-      // ➡️ CAMBIO SOLICITADO
-      // Actualizamos el tiempo de interacción del botón
-      lastInteractionTime = millis();
-      currentState = ADVANCED_CONFIG;
-      myEnc.write(selectedAdvancedOption * 4);
-      firstEnter = true;
-    } else if (longPressDetected) {
-      longPressDetected = false;
-      highTempAlarmAux = highTempAlarm;
-      currentState = ADVANCED_CONFIG;
-      myEnc.write(selectedAdvancedOption * 4);
-      firstEnter = true;
-    }
+  if (buttonClicked) {
+    buttonClicked = false;
+    highTempAlarm = highTempAlarmAux;
+    saveConfiguration();
+    u8x8.clearDisplay();
+    u8x8.drawString(x_offset, 3, "Guardado!");
+    buzzerBeep(1, 100, 0);
+    delay(1000);
+    lastInteractionTime = millis();
+    currentState = ADVANCED_CONFIG;
+    myEnc.write(selectedAdvancedOption * 4);
+    firstEnter = true;
+  } else if (longPressDetected) {
+    longPressDetected = false;
+    highTempAlarmAux = highTempAlarm;
+    currentState = ADVANCED_CONFIG;
+    myEnc.write(selectedAdvancedOption * 4);
+    firstEnter = true;
+  }
 }
 
 void handleManualControlState(long newPos) {
   static bool redraw = true;
   static bool firstEnter = true;
+
   if (firstEnter) {
     manualOutputValueAux = manualOutputValue;
     firstEnter = false;
     redraw = true;
   }
-  // ➡️ CAMBIO SOLICITADO
-  // Actualizamos el tiempo de interacción del encoder
+
   if (newPos != oldEncoderPosition) {
     lastInteractionTime = millis();
   }
@@ -918,6 +924,7 @@ void handleManualControlState(long newPos) {
     u8x8.drawString(x_offset, 6, "Long: salir");
     redraw = false;
   }
+
   if (buttonClicked) {
     buttonClicked = false;
     manualOutputValue = manualOutputValueAux;
@@ -928,8 +935,6 @@ void handleManualControlState(long newPos) {
     u8x8.drawString(x_offset, 3, "Guardado!");
     buzzerBeep(1, 100, 0);
     delay(1000);
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
     currentState = MENU;
     myEnc.write(selectedOption * 4);
@@ -946,14 +951,14 @@ void handleManualControlState(long newPos) {
 void handleCalibrationState(long newPos) {
   static bool redraw = true;
   static bool firstEnter = true;
+
   if (firstEnter) {
     calibrationOffsetAux = calibrationOffset;
     myEnc.write(calibrationOffsetAux * 10);
     firstEnter = false;
     redraw = true;
   }
-  // ➡️ CAMBIO SOLICITADO
-  // Actualizamos el tiempo de interacción del encoder
+
   newPos = myEnc.read() / 10;
   if (newPos != oldEncoderPosition) {
     lastInteractionTime = millis();
@@ -976,6 +981,7 @@ void handleCalibrationState(long newPos) {
     u8x8.drawString(x_offset, 6, "Long: salir");
     redraw = false;
   }
+
   if (buttonClicked) {
     buttonClicked = false;
     calibrationOffset = calibrationOffsetAux;
@@ -984,8 +990,6 @@ void handleCalibrationState(long newPos) {
     u8x8.drawString(x_offset, 3, "Guardado!");
     buzzerBeep(1, 100, 0);
     delay(1000);
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
     currentState = MENU;
     myEnc.write(selectedOption * 4);
@@ -1005,10 +1009,12 @@ void handleOutputTypeConfigState() {
 void handleSSRActivationConfirmationState() {
   static bool redraw = true;
   static bool timerStarted = false;
+
   if (!timerStarted) {
     lastButtonClickTime = millis();
     timerStarted = true;
   }
+
   if (redraw) {
     u8x8.clearDisplay();
     u8x8.drawString(x_offset, 0, "Confirmar Cambio");
@@ -1018,10 +1024,9 @@ void handleSSRActivationConfirmationState() {
     u8x8.drawString(x_offset - 1, 4 + confirmationCount, ">");
     redraw = false;
   }
+
   if (buttonClicked) {
     buttonClicked = false;
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
     if (confirmationCount == 0) {
       currentOutputType = OUTPUT_SSR;
@@ -1044,7 +1049,7 @@ void handleSSRActivationConfirmationState() {
     currentState = ADVANCED_CONFIG;
     timerStarted = false;
   }
-  
+
   long newPos = myEnc.read();
   if (newPos != oldEncoderPosition) {
     confirmationCount += (newPos - oldEncoderPosition) / 4;
@@ -1058,10 +1063,12 @@ void handleSSRActivationConfirmationState() {
 void handleMosfetActivationConfirmationState() {
   static bool redraw = true;
   static bool timerStarted = false;
+
   if (!timerStarted) {
     lastButtonClickTime = millis();
     timerStarted = true;
   }
+
   if (redraw) {
     u8x8.clearDisplay();
     u8x8.drawString(x_offset, 0, "Confirmar Cambio");
@@ -1074,8 +1081,6 @@ void handleMosfetActivationConfirmationState() {
 
   if (buttonClicked) {
     buttonClicked = false;
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
     if (confirmationCount == 0) {
       currentOutputType = OUTPUT_MOSFET_PWM;
@@ -1111,19 +1116,18 @@ void handleMosfetActivationConfirmationState() {
 
 void handleErrorState(const char* errorMsg) {
   static bool redraw = true;
-  
+
   if (millis() - errorTimer > SENSOR_TIMEOUT) {
     currentState = CONTROL;
   }
-  
-  // ➡️ CAMBIO SOLICITADO: Permitir salir del estado de error con el botón
+
   if (buttonClicked) {
     buttonClicked = false;
     currentState = CONTROL;
-    redraw = true; // Reinicia la pantalla para la siguiente vez
+    redraw = true;
     return;
   }
-  
+
   if (redraw) {
     u8x8.clearDisplay();
     u8x8.drawString(x_offset, 2, "ERROR: ");
@@ -1178,12 +1182,14 @@ void readSensor() {
   if (millis() - lastSensorReadTime > 250) {
     lastTempForProtection = currentTemp;
     currentTemp = thermocouple.getTemp();
+
     if (isnan(currentTemp)) {
-      u8x8.clearDisplay();
-      u8x8.drawString(x_offset, 3, "Error de sensor!");
-      delay(2000);
+      currentTemp = lastTempForProtection;
+      handleErrorState("Error de sensor!");
+      errorTimer = millis();
       return;
     }
+
     currentTemp += calibrationOffset;
     lastSensorReadTime = millis();
   }
@@ -1194,6 +1200,7 @@ void readButton() {
   if (currentButtonState == LOW && oldButtonState == HIGH) {
     buttonPressStartTime = millis();
   }
+
   if (currentButtonState == HIGH && oldButtonState == LOW) {
     unsigned long pressDuration = millis() - buttonPressStartTime;
     if (pressDuration >= longPressTime) {
@@ -1202,30 +1209,36 @@ void readButton() {
       buttonClicked = true;
     }
   }
+
   oldButtonState = currentButtonState;
 }
 
 void checkProtections() {
-    if (currentTemp > OVERSHOOT_LIMIT) {
-        handleErrorState("Overshoot Temp.");
-        errorTimer = millis();
-    }
-    if (highTempAlarmActive && currentTemp > highTempAlarm) {
-        highTempAlarmActive = true;
-    }
+  if (currentTemp > OVERSHOOT_LIMIT) {
+    handleErrorState("Overshoot Temp.");
+    errorTimer = millis();
+  }
+
+  if (currentTemp >= highTempAlarm) {
+    highTempAlarmActive = true;
+  }
+
+  if (currentTemp < highTempAlarm - 5.0) {
+    highTempAlarmActive = false;
+  }
 }
 
 void checkHeatingFailure() {
-    if (outputActive && (currentControlMode == MODE_PID || currentControlMode == MODE_ONOFF)) {
-        if (millis() - lastTempCheckTime > TEMP_RISE_TIMEOUT) {
-            if (currentTemp < tempAtLastCheck + 5.0) {
-                handleErrorState("Fallo de Calefaccion");
-                errorTimer = millis();
-            }
-            tempAtLastCheck = currentTemp;
-            lastTempCheckTime = millis();
-        }
+  if (outputActive && (currentControlMode == MODE_PID || currentControlMode == MODE_ONOFF)) {
+    if (millis() - lastTempCheckTime > TEMP_RISE_TIMEOUT) {
+      if (currentTemp < tempAtLastCheck + 5.0) {
+        handleErrorState("Fallo de Calefaccion");
+        errorTimer = millis();
+      }
+      tempAtLastCheck = currentTemp;
+      lastTempCheckTime = millis();
     }
+  }
 }
 
 void updateOutput(byte value) {
@@ -1241,35 +1254,35 @@ void updateOutput(byte value) {
 }
 
 void updateControllerOutput() {
-    pidSetpoint = setpoint;
-    pidInput = currentTemp;
+  pidSetpoint = setpoint;
+  pidInput = currentTemp;
 
-    if (outputActive) {
-      if (currentControlMode == MODE_PID) {
-        myPID.Compute();
-      } else if (currentControlMode == MODE_ONOFF) {
-        if (currentTemp < setpoint - onOffHysteresis) {
-          pidOutput = 255;
-        } else if (currentTemp > setpoint + onOffHysteresis) {
-          pidOutput = 0;
-        }
-      } else if (currentControlMode == MODE_MANUAL) {
-        pidOutput = manualOutputValue;
+  if (outputActive) {
+    if (currentControlMode == MODE_PID) {
+      myPID.Compute();
+    } else if (currentControlMode == MODE_ONOFF) {
+      if (currentTemp < setpoint - onOffHysteresis) {
+        pidOutput = 255;
+      } else if (currentTemp > setpoint + onOffHysteresis) {
+        pidOutput = 0;
       }
-    } else {
-      pidOutput = 0;
+    } else if (currentControlMode == MODE_MANUAL) {
+      pidOutput = manualOutputValue;
     }
+  } else {
+    pidOutput = 0;
+  }
 
-    updateOutput((byte)pidOutput);
+  updateOutput((byte)pidOutput);
 }
 
 void buzzerBeep(int count, int duration, int pause) {
   if (buzzerEnabled) {
-    for(int i = 0; i < count; i++) {
-        digitalWrite(BUZZER_PIN, HIGH);
-        delay(duration);
-        digitalWrite(BUZZER_PIN, LOW);
-        delay(pause);
+    for (int i = 0; i < count; i++) {
+      digitalWrite(BUZZER_PIN, HIGH);
+      delay(duration);
+      digitalWrite(BUZZER_PIN, LOW);
+      delay(pause);
     }
   }
 }
@@ -1287,23 +1300,25 @@ void checkSerialConnection() {
 }
 
 void sendSerialData() {
-    if (serialConnected) {
-        Serial.print("T:");
-        Serial.print(currentTemp, 1);
-        Serial.print("S:");
-        Serial.print(setpoint, 1);
-        Serial.print("O:");
-        Serial.println((int)pidOutput);
-    }
+  if (serialConnected) {
+    Serial.print("T:");
+    Serial.print(currentTemp, 1);
+    Serial.print(" S:");
+    Serial.print(setpoint, 1);
+    Serial.print(" O:");
+    Serial.println((int)pidOutput);
+  }
 }
 
 void handleResetConfirmationState() {
   static bool redraw = true;
   static bool timerStarted = false;
+
   if (!timerStarted) {
     lastButtonClickTime = millis();
     timerStarted = true;
   }
+
   if (redraw) {
     u8x8.clearDisplay();
     u8x8.drawString(x_offset, 0, "Confirmar Reinicio");
@@ -1316,8 +1331,6 @@ void handleResetConfirmationState() {
 
   if (buttonClicked) {
     buttonClicked = false;
-    // ➡️ CAMBIO SOLICITADO
-    // Actualizamos el tiempo de interacción del botón
     lastInteractionTime = millis();
     if (confirmationCount == 0) {
       resetToFactorySettings();
@@ -1339,7 +1352,7 @@ void handleResetConfirmationState() {
     currentState = MENU;
     timerStarted = false;
   }
-  
+
   long newPos = myEnc.read();
   if (newPos != oldEncoderPosition) {
     confirmationCount += (newPos - oldEncoderPosition) / 4;
@@ -1350,18 +1363,15 @@ void handleResetConfirmationState() {
   }
 }
 
-// ➡️ NUEVA FUNCIÓN
-// Nuevo prototipo para la función de alarmas.
 void checkAlarms() {
-    // Si la temperatura actual supera la alarma, activamos un aviso visual y sonoro
-    if (currentTemp >= highTempAlarm && highTempAlarmActive == false && buzzerEnabled) {
-        buzzerBeep(3, 100, 100);
-        highTempAlarmActive = true;
-    }
+  if (currentTemp >= highTempAlarm && !highTempAlarmActive && buzzerEnabled) {
+    buzzerBeep(3, 100, 100);
+    highTempAlarmActive = true;
+  }
 
-    if (highTempAlarmActive && buttonClicked) {
-        highTempAlarmActive = false;
-        buttonClicked = false;
-        u8x8.clearDisplay(); // Limpiamos la pantalla para volver al estado normal
-    }
+  if (highTempAlarmActive && buttonClicked) {
+    highTempAlarmActive = false;
+    buttonClicked = false;
+    u8x8.clearDisplay();
+  }
 }
